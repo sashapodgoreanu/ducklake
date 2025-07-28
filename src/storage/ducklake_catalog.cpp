@@ -208,6 +208,13 @@ unique_ptr<DuckLakeCatalogSet> DuckLakeCatalog::LoadSchemaForSnapshot(DuckLakeTr
 		schema_info.schema = schema.name;
 		auto schema_entry = make_uniq<DuckLakeSchemaEntry>(*this, schema_info, schema.id, std::move(schema.uuid),
 		                                                   std::move(schema.path));
+	/************ IRION ************/
+		// cerca la databox associata se esiste
+		auto result = catalog.databox_list.find(schema.id);
+		if (result != catalog.databox_list.end()) {
+			schema_entry->LinkToDatabox(result->second);
+		}
+			/************ IRION ************/
 		schema_map.insert(make_pair(std::move(schema.name), std::move(schema_entry)));
 	}
 
@@ -393,15 +400,18 @@ optional_ptr<DuckLakeTableStats> DuckLakeCatalog::GetTableStats(DuckLakeTransact
 optional_ptr<SchemaCatalogEntry> DuckLakeCatalog::LookupSchema(CatalogTransaction transaction,
                                                                const EntryLookupInfo &schema_lookup,
                                                                OnEntryNotFound if_not_found) {
-	auto &schema_name = schema_lookup.GetEntryName();
+	// db1 -> schema1
+	auto &look_up_name = schema_lookup.GetEntryName();
+	// auto &schema_name = "schema3";
 	auto at_clause = schema_lookup.GetAtClause();
 	auto &duck_transaction = transaction.transaction->Cast<DuckLakeTransaction>();
+	// TODO gestione schemi non acnora commitati al interno di una tx.
 	if (!at_clause) {
 		// if we have an AT clause we can never read transaction-local changes
 		// look for the schema in the set of transaction-local schemas
 		auto set = duck_transaction.GetTransactionLocalSchemas();
 		if (set) {
-			auto entry = set->GetEntry<SchemaCatalogEntry>(schema_name);
+			auto entry = set->GetEntry<SchemaCatalogEntry>(look_up_name);
 			if (entry) {
 				return entry;
 			}
@@ -409,10 +419,16 @@ optional_ptr<SchemaCatalogEntry> DuckLakeCatalog::LookupSchema(CatalogTransactio
 	}
 	auto snapshot = duck_transaction.GetSnapshot(at_clause);
 	auto &schemas = GetSchemaForSnapshot(duck_transaction, snapshot);
-	auto entry = schemas.GetEntry<SchemaCatalogEntry>(schema_name);
+
+	// schemas.GetEntryByAlias<SchemaCatalogEntry>(look_up_name);
+	auto entry = schemas.GetEntryByDatabox<SchemaCatalogEntry>(look_up_name);
+
+	if (!entry) {
+		entry = schemas.GetEntry<SchemaCatalogEntry>(look_up_name);
+	}
 	if (!entry) {
 		if (if_not_found == OnEntryNotFound::THROW_EXCEPTION) {
-			throw BinderException("Schema \"%s\" not found in DuckLakeCatalog \"%s\"", schema_name, GetName());
+			throw BinderException("Schema \"%s\" not found in DuckLakeCatalog \"%s\"", look_up_name, GetName());
 		}
 		return nullptr;
 	}

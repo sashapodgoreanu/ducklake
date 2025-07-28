@@ -81,7 +81,9 @@ static unique_ptr<FunctionData> DuckLakeListFilesBind(ClientContext &context, Ta
 	auto table_name = StringValue::Get(input.inputs[1]);
 	EntryLookupInfo table_lookup(CatalogType::TABLE_ENTRY, table_name, at_clause.get(), QueryErrorContext());
 	auto table_entry = catalog.GetEntry(context, schema, table_lookup, OnEntryNotFound::THROW_EXCEPTION);
-	auto &ducklake_table = table_entry->Cast<DuckLakeTableEntry>();
+		/************ IRION ************/
+	auto &ducklake_table = reinterpret_cast<DuckLakeTableEntry &>(*table_entry);
+		/************ IRION ************/
 	auto snapshot = transaction.GetSnapshot(at_clause.get());
 
 	// fetch the file list

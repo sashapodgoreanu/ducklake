@@ -58,10 +58,69 @@ CREATE TABLE {METADATA_CATALOG}.ducklake_files_scheduled_for_deletion(data_file_
 CREATE TABLE {METADATA_CATALOG}.ducklake_inlined_data_tables(table_id BIGINT, table_name VARCHAR, schema_version BIGINT);
 CREATE TABLE {METADATA_CATALOG}.ducklake_schema_settings(schema_id BIGINT, key VARCHAR NOT NULL, value VARCHAR NOT NULL);
 CREATE TABLE {METADATA_CATALOG}.ducklake_table_settings(table_id BIGINT, key VARCHAR NOT NULL, value VARCHAR NOT NULL);
-INSERT INTO {METADATA_CATALOG}.ducklake_snapshot VALUES (0, NOW(), 0, 1, 0);
+INSERT INTO {METADATA_CATALOG}.ducklake_snapshot VALUES (0, NOW(), 0, 7, 0);
 INSERT INTO {METADATA_CATALOG}.ducklake_snapshot_changes VALUES (0, 'created_schema:"main"');
 INSERT INTO {METADATA_CATALOG}.ducklake_metadata (key, value) VALUES ('version', '0.2'), ('created_by', 'DuckDB %s'), ('data_path', %s), ('encrypted', '%s');
 INSERT INTO {METADATA_CATALOG}.ducklake_schema VALUES (0, UUID(), 0, NULL, 'main', 'main/', true);
+
+/***** IRION *****/
+
+CREATE SCHEMA IF NOT EXISTS {METADATA_CATALOG_NAME_IDENTIFIER}.bcd123;
+CREATE SCHEMA IF NOT EXISTS {METADATA_CATALOG_NAME_IDENTIFIER}.ggghhh;
+
+INSERT INTO {METADATA_CATALOG}.ducklake_schema VALUES (1, UUID(), 0, NULL, 'bcd123', 'bcd123/', true);
+INSERT INTO {METADATA_CATALOG}.ducklake_schema VALUES (2, UUID(), 0, NULL, 'ggghhh', 'ggghhh/', true);
+INSERT INTO {METADATA_CATALOG}.ducklake_schema VALUES (3, UUID(), 0, NULL, 'schema3', 'schema3/', true);
+INSERT INTO {METADATA_CATALOG}.ducklake_schema VALUES (4, UUID(), 0, NULL, 'schema4', 'schema4/', true);
+INSERT INTO {METADATA_CATALOG}.ducklake_schema VALUES (5, UUID(), 0, NULL, 'schema5', 'schema5/', true);
+INSERT INTO {METADATA_CATALOG}.ducklake_schema VALUES (6, UUID(), 0, NULL, 'schema6', 'schema6/', true);
+INSERT INTO {METADATA_CATALOG}.ducklake_schema VALUES (7, UUID(), 0, NULL, 'schema7', 'schema7/', true);
+
+
+CREATE TABLE IF NOT EXISTS {METADATA_CATALOG}.lake_shelves (
+    shelf_lake_id            INTEGER     NOT NULL,
+    data_box_list_schema_id  INTEGER     NOT NULL,
+    shelf_lake_name          VARCHAR     NOT NULL,
+    begin_snapshot           INTEGER     NOT NULL,
+    end_snapshot             INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS {METADATA_CATALOG_NAME_IDENTIFIER}.bcd123.databox_list (
+    data_box_id     INTEGER     NOT NULL,
+    data_box_key    VARCHAR     NOT NULL,
+    schema_id       INTEGER     NOT NULL,
+    begin_snapshot  INTEGER     NOT NULL,
+    end_snapshot    INTEGER
+);
+
+
+CREATE TABLE IF NOT EXISTS {METADATA_CATALOG_NAME_IDENTIFIER}.ggghhh.databox_list (
+    data_box_id     INTEGER     NOT NULL,
+    data_box_key    VARCHAR     NOT NULL,
+    schema_id       INTEGER     NOT NULL,
+    begin_snapshot  INTEGER     NOT NULL,
+    end_snapshot    INTEGER
+);
+
+INSERT INTO {METADATA_CATALOG}.lake_shelves
+  (shelf_lake_id, data_box_list_schema_id, shelf_lake_name, begin_snapshot, end_snapshot) VALUES
+  (1, 1, 'my_shelf',   1, NULL),
+  (2, 2, 'my_shelf_w', 1, NULL);
+
+INSERT INTO {METADATA_CATALOG_NAME_IDENTIFIER}.bcd123.databox_list
+  (data_box_id, data_box_key, schema_id, begin_snapshot, end_snapshot) VALUES
+  (1, 'db1',  3, 1,  NULL),
+  (2, 'db2',  4, 1,  NULL),
+  (3, 'db3',  5, 1,  NULL);
+
+INSERT INTO {METADATA_CATALOG_NAME_IDENTIFIER}.ggghhh.databox_list
+  (data_box_id, data_box_key, schema_id, begin_snapshot, end_snapshot) VALUES
+  (1, 'db1', 6, 1, NULL),
+  (2, 'db2', 7, 1, NULL);
+
+
+/***** IRION *****/
+
 	)",
 	                                       DuckDB::SourceID(), SQLString(data_path), encryption_str);
 	// TODO: add
@@ -181,8 +240,31 @@ DuckLakeCatalogInfo DuckLakeMetadataManager::GetCatalogForSnapshot(DuckLakeSnaps
 	auto &ducklake_catalog = transaction.GetCatalog();
 	auto &base_data_path = ducklake_catalog.DataPath();
 	DuckLakeCatalogInfo catalog;
-	// load the schema information
+
+
+		/************ IRION ************/
 	auto result = transaction.Query(snapshot, R"(
+SELECT data_box_id, data_box_key, schema_id
+FROM {METADATA_CATALOG_NAME_IDENTIFIER}.bcd123.databox_list
+WHERE {SNAPSHOT_ID} >= begin_snapshot AND ({SNAPSHOT_ID} < end_snapshot OR end_snapshot IS NULL)
+)");
+
+	if (result->HasError()) {
+		result->GetErrorObject().Throw("Failed to get data box list information from DuckLake: ");
+	}
+
+	for (auto &row : *result) {
+		LakeShelfDataboxInfo databox_info;
+		databox_info.id = row.GetValue<int32_t>(0);
+		databox_info.key = row.GetValue<string>(1);
+		databox_info.schema_id = SchemaIndex(row.GetValue<int32_t>(2));
+		catalog.databox_list[databox_info.schema_id] = databox_info;
+	}
+
+		/************ IRION ************/
+
+	// load the schema information
+	result = transaction.Query(snapshot, R"(
 SELECT schema_id, schema_uuid::VARCHAR, schema_name, path, path_is_relative
 FROM {METADATA_CATALOG}.ducklake_schema
 WHERE {SNAPSHOT_ID} >= begin_snapshot AND ({SNAPSHOT_ID} < end_snapshot OR end_snapshot IS NULL)

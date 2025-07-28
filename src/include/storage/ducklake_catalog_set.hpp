@@ -29,13 +29,29 @@ public:
 	DuckLakeCatalogSet(ducklake_entries_map_t catalog_entries_p);
 
 	void CreateEntry(unique_ptr<CatalogEntry> entry);
+	
 	optional_ptr<CatalogEntry> GetEntry(const string &name);
+	/************ IRION ************/
+	optional_ptr<CatalogEntry> GetEntryByDatabox(const string &key);
+	/************ IRION ************/
 	unique_ptr<CatalogEntry> DropEntry(const string &name);
 	optional_ptr<CatalogEntry> GetEntryById(SchemaIndex index);
 	optional_ptr<CatalogEntry> GetEntryById(TableIndex index);
 	void AddEntry(DuckLakeSchemaEntry &schema, TableIndex id, unique_ptr<CatalogEntry> entry);
 	void RemapEntry(SchemaIndex old_index, SchemaIndex new_index, DuckLakeSchemaEntry &schema);
 	void RemapEntry(TableIndex old_index, TableIndex new_index, DuckLakeTableEntry &table);
+
+
+	/************ IRION ************/
+	template <class T>
+	optional_ptr<T> GetEntryByDatabox(const string &name) {
+		auto entry = GetEntryByDatabox(name);
+		if (!entry) {
+			return nullptr;
+		}
+		return entry->Cast<T>();
+	}
+	/************ IRION ************/
 
 	template <class T>
 	optional_ptr<T> GetEntry(const string &name) {
@@ -55,6 +71,10 @@ public:
 
 private:
 	ducklake_entries_map_t catalog_entries;
+	/************ IRION ************/
+	case_insensitive_map_t<reference<DuckLakeSchemaEntry>> databox_info_map;
+	
+	/************ IRION ************/
 	map<SchemaIndex, reference<DuckLakeSchemaEntry>> schema_entry_map;
 	map<TableIndex, reference<CatalogEntry>> table_entry_map;
 };

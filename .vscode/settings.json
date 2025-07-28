@@ -1,0 +1,25 @@
+{
+	"files.associations": {
+		".fantomasignore": "ignore",
+		"*.cpp": "cpp",
+		"chrono": "cpp",
+		"span": "cpp",
+		"type_traits": "cpp",
+		"string": "cpp",
+		"string_view": "cpp",
+		"deque": "cpp",
+		"list": "cpp",
+		"unordered_map": "cpp",
+		"unordered_set": "cpp",
+		"vector": "cpp",
+		"array": "cpp",
+		"memory": "cpp",
+		"format": "cpp",
+		"future": "cpp",
+		"istream": "cpp",
+		"functional": "cpp",
+		"tuple": "cpp",
+		"utility": "cpp",
+		"variant": "cpp"
+	}
+}

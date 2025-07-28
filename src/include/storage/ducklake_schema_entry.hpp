@@ -10,6 +10,7 @@
 
 #include "duckdb/catalog/catalog_entry/schema_catalog_entry.hpp"
 #include "storage/ducklake_catalog_set.hpp"
+#include "storage/ducklake_metadata_info.hpp"
 
 namespace duckdb {
 class DuckLakeTransaction;
@@ -64,6 +65,11 @@ public:
 
 	static string GeneratePathFromName(const string &uuid, const string &name);
 
+		/************ IRION ************/
+	void LinkToDatabox(LakeShelfDataboxInfo &info);
+	LakeShelfDataboxInfo &GetDataBoxInfo();
+	/************ IRION ************/
+
 private:
 	DuckLakeCatalogSet &GetCatalogSet(CatalogType type);
 	bool HandleCreateConflict(CatalogTransaction transaction, CatalogType type, const string &name,
@@ -73,6 +79,9 @@ private:
 	optional_ptr<CatalogEntry> LoadBuiltInFunction(DefaultTableMacro macro);
 
 private:
+	/************ IRION ************/
+	LakeShelfDataboxInfo data_box_info;
+		/************ IRION ************/
 	SchemaIndex schema_id;
 	string schema_uuid;
 	string data_path;

@@ -21,6 +21,9 @@ namespace duckdb {
 using option_map_t = unordered_map<string, string>;
 
 struct DuckLakeOptions {
+	/************ IRION ************/
+	string shelf_name;
+	/********** END IRION **********/
 	string metadata_database;
 	string metadata_path;
 	string metadata_schema;

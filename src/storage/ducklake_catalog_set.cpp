@@ -12,6 +12,10 @@ DuckLakeCatalogSet::DuckLakeCatalogSet(ducklake_entries_map_t catalog_entries_p)
 	for (auto &entry : catalog_entries) {
 		auto &schema_entry = entry.second->Cast<DuckLakeSchemaEntry>();
 		schema_entry_map.insert(make_pair(schema_entry.GetSchemaId(), reference<DuckLakeSchemaEntry>(schema_entry)));
+			/************ IRION ************/
+		auto &db_info = schema_entry.GetDataBoxInfo();
+		databox_info_map.insert(make_pair(db_info.key, reference<DuckLakeSchemaEntry>(schema_entry)));
+	/************ IRION ************/	
 	}
 }
 
@@ -31,6 +35,14 @@ unique_ptr<CatalogEntry> DuckLakeCatalogSet::DropEntry(const string &name) {
 	return catalog_entry;
 }
 
+optional_ptr<CatalogEntry> DuckLakeCatalogSet::GetEntryByDatabox(const string &name) {
+	auto entry = databox_info_map.find(name);
+	if (entry == databox_info_map.end()) {
+		return nullptr;
+	}
+	return entry->second.get();
+}
+
 optional_ptr<CatalogEntry> DuckLakeCatalogSet::GetEntry(const string &name) {
 	auto entry = catalog_entries.find(name);
 	if (entry == catalog_entries.end()) {
@@ -38,6 +50,7 @@ optional_ptr<CatalogEntry> DuckLakeCatalogSet::GetEntry(const string &name) {
 	}
 	return entry->second.get();
 }
+
 
 optional_ptr<CatalogEntry> DuckLakeCatalogSet::GetEntryById(SchemaIndex index) {
 	auto entry = schema_entry_map.find(index);

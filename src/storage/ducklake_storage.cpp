@@ -11,6 +11,20 @@ static unique_ptr<Catalog> DuckLakeAttach(StorageExtensionInfo *storage_info, Cl
                                           AccessMode access_mode) {
 	DuckLakeOptions options;
 	options.metadata_path = info.path;
+
+	/************ IRION ************/
+	auto pos = info.path.find(':');
+
+	// extract the default shelf name
+	string first = (pos != string::npos) ? info.path.substr(0, pos) : info.path;
+
+	// remove the default shelf name
+	if (pos != string::npos) {
+		info.path.erase(0, pos + 1);
+		options.shelf_name = first;
+	}
+	/************ IRION ************/
+
 	for (auto &entry : info.options) {
 		auto lcase = StringUtil::Lower(entry.first);
 		if (lcase == "data_path") {

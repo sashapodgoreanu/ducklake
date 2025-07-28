@@ -41,6 +41,25 @@ struct DuckLakeMetadata {
 	vector<DuckLakeTableSetting> table_settings;
 };
 
+	/************ IRION ************/
+struct LakeShelfInfo {
+	idx_t id;
+	SchemaIndex schema_id;
+	string name;
+};
+
+struct LakeShelfDataboxInfo {
+	idx_t id;
+	string key;
+	SchemaIndex schema_id;
+	idx_t lake_shelf_id;
+};
+
+struct LakeShelfMetadata {
+	LakeShelfInfo lakeshelf_info;
+	case_insensitive_map_t<LakeShelfDataboxInfo> datalox_list;
+};
+	/************ IRION ************/
 struct DuckLakeSchemaInfo {
 	SchemaIndex id;
 	string uuid;
@@ -218,11 +237,19 @@ struct DuckLakeNewColumn {
 	optional_idx parent_idx;
 };
 
+// sss -> shelf1.box
+
+// search(shelf1) = shelfinfo
+
+// shelfinfo
+
 struct DuckLakeCatalogInfo {
 	vector<DuckLakeSchemaInfo> schemas;
 	vector<DuckLakeTableInfo> tables;
 	vector<DuckLakeViewInfo> views;
 	vector<DuckLakePartitionInfo> partitions;
+	// case_insensitive_map_t<LakeShelfMetadata> shelves;
+	map<SchemaIndex, LakeShelfDataboxInfo> databox_list;
 };
 
 struct DuckLakeFileData {

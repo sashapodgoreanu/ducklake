@@ -15,6 +15,13 @@ set(EXTENSION_SOURCES ${ALL_OBJECT_FILES})
 build_static_extension(${TARGET_NAME} ${EXTENSION_SOURCES})
 build_loadable_extension(${TARGET_NAME} " " ${EXTENSION_SOURCES})
 
+
+# Check build type and define preprocessor macros
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+  message(STATUS "NDEBUG set") 
+  target_compile_definitions(${EXTENSION_NAME} PUBLIC -DNDEBUG) 
+endif()
+
 install(
   TARGETS ${EXTENSION_NAME}
   EXPORT "${DUCKDB_EXPORT_SET}"

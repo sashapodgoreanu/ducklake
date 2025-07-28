@@ -252,7 +252,15 @@ void DuckLakeSchemaEntry::Scan(CatalogType type, const std::function<void(Catalo
 		callback(*entry.second);
 	}
 }
+	/************ IRION ************/
+void DuckLakeSchemaEntry::LinkToDatabox(LakeShelfDataboxInfo &info) {
+	data_box_info = info;
+}
 
+LakeShelfDataboxInfo &DuckLakeSchemaEntry::GetDataBoxInfo() {
+	return data_box_info;
+}
+	/************ IRION ************/
 void DuckLakeSchemaEntry::DropEntry(ClientContext &context, DropInfo &info) {
 	if (info.cascade) {
 		throw NotImplementedException("Cascade Drop not supported in DuckLake");
