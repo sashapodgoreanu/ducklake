@@ -13,6 +13,7 @@
 #include "duckdb/catalog/catalog_entry.hpp"
 #include "common/ducklake_snapshot.hpp"
 #include "common/index.hpp"
+#include "common/ducklake_options.hpp"
 
 namespace duckdb {
 class DuckLakeTransaction;
@@ -32,7 +33,7 @@ public:
 	
 	optional_ptr<CatalogEntry> GetEntry(const string &name);
 	/************ IRION ************/
-	optional_ptr<CatalogEntry> GetEntryByDatabox(const string &key);
+	optional_ptr<CatalogEntry> GetEntryByDatabox(const LakeShelfDataboxMapping &dbox);
 	/************ IRION ************/
 	unique_ptr<CatalogEntry> DropEntry(const string &name);
 	optional_ptr<CatalogEntry> GetEntryById(SchemaIndex index);
@@ -44,13 +45,13 @@ public:
 
 	/************ IRION ************/
 	template <class T>
-	optional_ptr<T> GetEntryByDatabox(const string &name) {
-		auto entry = GetEntryByDatabox(name);
+	optional_ptr<T> GetEntryByDatabox(const LakeShelfDataboxMapping &dbox) {
+		auto entry = GetEntryByDatabox(dbox);
 		if (!entry) {
 			return nullptr;
 		}
 		return entry->Cast<T>();
-	}
+	}	
 	/************ IRION ************/
 
 	template <class T>

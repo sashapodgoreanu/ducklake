@@ -2,6 +2,7 @@
 #include "storage/ducklake_schema_entry.hpp"
 #include "storage/ducklake_table_entry.hpp"
 #include "storage/ducklake_transaction.hpp"
+#include "common/ducklake_options.hpp"
 
 namespace duckdb {
 
@@ -35,8 +36,9 @@ unique_ptr<CatalogEntry> DuckLakeCatalogSet::DropEntry(const string &name) {
 	return catalog_entry;
 }
 
-optional_ptr<CatalogEntry> DuckLakeCatalogSet::GetEntryByDatabox(const string &name) {
-	auto entry = databox_info_map.find(name);
+optional_ptr<CatalogEntry> DuckLakeCatalogSet::GetEntryByDatabox(const LakeShelfDataboxMapping &dbox) {
+	//manca check su shelf
+	auto entry = databox_info_map.find(dbox.databox_key);
 	if (entry == databox_info_map.end()) {
 		return nullptr;
 	}

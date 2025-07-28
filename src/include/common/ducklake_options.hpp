@@ -20,10 +20,12 @@ namespace duckdb {
 
 using option_map_t = unordered_map<string, string>;
 
-struct DuckLakeOptions {
-	/************ IRION ************/
+struct LakeShelfDataboxMapping {
 	string shelf_name;
-	/********** END IRION **********/
+	string databox_key;
+};
+
+struct DuckLakeOptions {
 	string metadata_database;
 	string metadata_path;
 	string metadata_schema;
@@ -36,6 +38,11 @@ struct DuckLakeOptions {
 	option_map_t config_options;
 	map<SchemaIndex, option_map_t> schema_options;
 	map<TableIndex, option_map_t> table_options;
+
+	/************ IRION ************/
+	LakeShelfDataboxMapping shelf_context;
+	/********** END IRION **********/
+	case_insensitive_map_t<LakeShelfDataboxMapping> shelf_aliasis; //alias=shelf.databox
 };
 
 } // namespace duckdb

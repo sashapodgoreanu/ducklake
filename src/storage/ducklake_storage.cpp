@@ -19,10 +19,39 @@ static unique_ptr<Catalog> DuckLakeAttach(StorageExtensionInfo *storage_info, Cl
 	string first = (pos != string::npos) ? info.path.substr(0, pos) : info.path;
 
 	// remove the default shelf name
-	if (pos != string::npos) {
-		info.path.erase(0, pos + 1);
-		options.shelf_name = first;
-	}
+	// ducklake:postgres:dbname=mydatabase host=localhost user=user password=password:my_shelf.db1 alias1=my_shelf_w.db1 alias2=my_shelf.db2
+	/*
+		ducklake
+		postgres
+		dbname=mydatabase host=localhost user=user password=password
+		context=my_shelf.db1 alias1=my_shelf_w.db1 alias2=my_shelf.db2
+		=>
+			context=my_shelf.db1
+			alias1=my_shelf_w.db1
+			alias2=my_shelf.db2
+	*/
+
+	// Inizializzazione struttura per gestione alias mapping, da vedere con parsing di stringa di ATTACH
+    LakeShelfDataboxMapping dbox;
+	dbox.shelf_name = "my_shelf_w";
+	dbox.databox_key = "db1";
+	options.shelf_aliasis["alias1"] = dbox;
+
+    LakeShelfDataboxMapping dbox2;
+	dbox2.shelf_name = "my_shelf";
+	dbox2.databox_key = "db2";
+	options.shelf_aliasis["alias2"] = dbox2;
+
+	
+    LakeShelfDataboxMapping ctx;
+	ctx.shelf_name = "my_shelf";
+	ctx.databox_key = "db1";
+	options.shelf_context = ctx;
+
+	// if (pos != string::npos) {
+	// 	info.path.erase(0, pos + 1);
+	// 	options.shelf_name = first;
+	// }
 	/************ IRION ************/
 
 	for (auto &entry : info.options) {

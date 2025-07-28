@@ -400,6 +400,10 @@ optional_ptr<DuckLakeTableStats> DuckLakeCatalog::GetTableStats(DuckLakeTransact
 optional_ptr<SchemaCatalogEntry> DuckLakeCatalog::LookupSchema(CatalogTransaction transaction,
                                                                const EntryLookupInfo &schema_lookup,
                                                                OnEntryNotFound if_not_found) {
+
+
+
+
 	// db1 -> schema1
 	auto &look_up_name = schema_lookup.GetEntryName();
 	// auto &schema_name = "schema3";
@@ -420,9 +424,25 @@ optional_ptr<SchemaCatalogEntry> DuckLakeCatalog::LookupSchema(CatalogTransactio
 	auto snapshot = duck_transaction.GetSnapshot(at_clause);
 	auto &schemas = GetSchemaForSnapshot(duck_transaction, snapshot);
 
-	// schemas.GetEntryByAlias<SchemaCatalogEntry>(look_up_name);
-	auto entry = schemas.GetEntryByDatabox<SchemaCatalogEntry>(look_up_name);
 
+	//recupero context dalle options dell'ATTACH, eg. shelf.dbox
+	auto &ctx = options.shelf_context;
+
+	//verificare meglio la gestione del default schema, in questo caso ctx viene sempre usato e quindi la databox 
+	//verrà sempre usata, anche se non dovrebbe
+
+	//controllo per prima cosa che il look_up_name sia relativo ad un alias di connessione
+	auto alias = options.shelf_aliasis.find(look_up_name);	
+
+	//se look_up_name è un alias, allora l'alias diventa il context
+	if (alias != options.shelf_aliasis.end()) {
+		ctx = alias->second;
+	}
+	
+	//a questo punto cerco la datbox per context
+	auto entry = schemas.GetEntryByDatabox<SchemaCatalogEntry>(ctx);
+	
+	//se non la trovo, vuol dire che è un semplice schema
 	if (!entry) {
 		entry = schemas.GetEntry<SchemaCatalogEntry>(look_up_name);
 	}
