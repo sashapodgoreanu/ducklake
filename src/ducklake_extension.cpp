@@ -8,14 +8,153 @@
 #include "storage/ducklake_storage.hpp"
 #include "functions/ducklake_table_functions.hpp"
 #include "duckdb/main/extension_util.hpp"
+#include "duckdb/parser/sql_statement.hpp"
+#include "duckdb/parser/statement/create_statement.hpp"
+#include "duckdb/parser/parsed_data/create_schema_info.hpp"
+#include "duckdb/parser/statement/extension_statement.hpp"
 
 namespace duckdb {
+
+class PsqlState : public ClientContextState {
+public:
+	explicit PsqlState(unique_ptr<ParserExtensionParseData> parse_data) : parse_data(std::move(parse_data)) {
+	}
+
+	void QueryEnd() override {
+		parse_data.reset();
+	}
+
+	unique_ptr<ParserExtensionParseData> parse_data;
+};
+
+struct PsqlParseData : ParserExtensionParseData {
+	unique_ptr<SQLStatement> statement;
+
+	unique_ptr<ParserExtensionParseData> Copy() const override {
+		return make_uniq_base<ParserExtensionParseData, PsqlParseData>(statement->Copy());
+	}
+
+	virtual string ToString() const override {
+		return "PsqlParseData";
+	}
+
+	PsqlParseData(unique_ptr<SQLStatement> statement) : statement(std::move(statement)) {
+	}
+};
+
+struct DataBoxCreateInfo : public CreateInfo {
+public:
+	DataBoxCreateInfo() : CreateInfo(CatalogType::SCHEMA_ENTRY) {
+		pippo = "funziona";
+	}
+
+	string pippo;
+};
+
+static BoundStatement BindCreateDataBox(ClientContext &context, Binder &binder, OperatorExtensionInfo *info_p,
+                                        SQLStatement &stmt) {
+	// down‐cast to see if it’s ours:
+	// auto *create = dynamic_cast<CreateDataBoxStatement*>(&stmt);
+	// if (!create) {
+	// not ours: let someone else bind it
+	//    return BoundStatement();
+	//}
+
+	return binder.Bind(stmt);
+
+	// CREATE statements return no rows
+	return BoundStatement();
+}
+
+class DataBoxOperatorExtension : public OperatorExtension {
+	DataBoxOperatorExtension() {
+		Bind = BindCreateDataBox;
+	};
+};
+
+/// CREATE DATABOX
+struct CreateDataBoxInfo : public CreateSchemaInfo {
+    string name;
+    CreateDataBoxInfo()
+        : CreateSchemaInfo() {
+    }
+
+    unique_ptr<CreateInfo> Copy() const override {
+        auto result = make_uniq<CreateDataBoxInfo>();
+        CopyProperties(*result);
+        result->name = name;
+        return result;
+    }
+
+    string ToString() const override {
+        return "CREATE DATABOX " + catalog + "." + schema + "." + name;
+    }
+};
+
+
+ParserExtensionParseResult lakeshelf_parse(ParserExtensionInfo *, const string &query) {
+	//  statement->Cast<CreateStatement>().info = make_uniq<DataBoxCreateInfo>();
+	auto stm = make_uniq<CreateStatement>();
+	auto create_info = make_uniq<CreateSchemaInfo>();
+	create_info->catalog = "my_ducklake";
+	create_info->schema = "funziona";
+	stm->info = std::move(create_info);
+	stm->stmt_location = 0; // offset in the original string
+	stm->stmt_length = query.length();
+	stm->query = query;
+	return ParserExtensionParseResult(make_uniq_base<ParserExtensionParseData, PsqlParseData>(std::move(stm)));
+}
+
+ParserExtensionPlanResult lakeshelf_plan(ParserExtensionInfo *, ClientContext &context,
+                                         unique_ptr<ParserExtensionParseData> parse_data) {
+
+	auto prql_state = make_shared_ptr<PsqlState>(std::move(parse_data));
+	context.registered_state->Insert("lakeshelf_plan", prql_state);
+
+	throw BinderException("Use bind instead");
+}
+
+struct PrqlParserExtension : public ParserExtension {
+	PrqlParserExtension() : ParserExtension() {
+		parse_function = lakeshelf_parse;
+		plan_function = lakeshelf_plan;
+	}
+};
+
+BoundStatement prql_bind(ClientContext &context, Binder &binder, OperatorExtensionInfo *info, SQLStatement &statement) {
+
+	auto lookup = context.registered_state->Get<PsqlState>("lakeshelf_plan");
+	auto prql_state = (PsqlState *)lookup.get();
+	auto prql_parse_data = dynamic_cast<PsqlParseData *>(prql_state->parse_data.get());
+
+	auto shelf_binder = Binder::CreateBinder(context, &binder);
+	auto bound_stmt = shelf_binder->Bind(*(prql_parse_data->statement));
+	return bound_stmt;
+}
+
+struct PrqlOperatorExtension : public OperatorExtension {
+	PrqlOperatorExtension() : OperatorExtension() {
+		Bind = prql_bind;
+	}
+
+	std::string GetName() override {
+		return "prql";
+	}
+
+	unique_ptr<LogicalExtensionOperator> Deserialize(Deserializer &deserializer) override {
+		throw InternalException("prql operator should not be serialized");
+	}
+};
 
 static void LoadInternal(DatabaseInstance &instance) {
 	ExtensionUtil::RegisterExtension(instance, "ducklake", {"Adds support for DuckLake, SQL as a Lakehouse Format"});
 
 	auto &config = DBConfig::GetConfig(instance);
 	config.storage_extensions["ducklake"] = make_uniq<DuckLakeStorageExtension>();
+
+	PrqlParserExtension op;
+	config.parser_extensions.push_back(op);
+	config.operator_extensions.push_back(make_uniq<PrqlOperatorExtension>());
 
 	DuckLakeSnapshotsFunction snapshots;
 	ExtensionUtil::RegisterFunction(instance, snapshots);
