@@ -14,6 +14,7 @@
 #include "storage/ducklake_catalog_set.hpp"
 #include "storage/ducklake_partition_data.hpp"
 #include "storage/ducklake_stats.hpp"
+#include "duckdb/parser/parsed_data/create_schema_info.hpp"
 
 namespace duckdb {
 class ColumnList;
@@ -22,6 +23,24 @@ struct DuckLakeFileListEntry;
 struct DuckLakeConfigOption;
 struct DeleteFileMap;
 class LogicalGet;
+
+/// CREATE DATABOX  SPOSTA QUESTO DA QUI!!!!!!
+struct CreateDataBoxInfo : public CreateSchemaInfo {
+	string shelf;
+	CreateDataBoxInfo() : CreateSchemaInfo() {
+	}
+
+	unique_ptr<CreateInfo> Copy() const override {
+		auto result = make_uniq<CreateDataBoxInfo>();
+		CopyProperties(*result);
+		result->shelf = shelf;
+		return result;
+	}
+
+	string ToString() const override {
+		return "CREATE DATABOX " + catalog + "." + shelf + "." + schema;
+	}
+};
 
 class DuckLakeCatalog : public Catalog {
 public:

@@ -12,6 +12,10 @@
 #include "duckdb/parser/statement/create_statement.hpp"
 #include "duckdb/parser/parsed_data/create_schema_info.hpp"
 #include "duckdb/parser/statement/extension_statement.hpp"
+#include "storage/ducklake_catalog.hpp"
+
+#include <regex>
+#include <memory>
 
 namespace duckdb {
 
@@ -42,15 +46,6 @@ struct PsqlParseData : ParserExtensionParseData {
 	}
 };
 
-struct DataBoxCreateInfo : public CreateInfo {
-public:
-	DataBoxCreateInfo() : CreateInfo(CatalogType::SCHEMA_ENTRY) {
-		pippo = "funziona";
-	}
-
-	string pippo;
-};
-
 static BoundStatement BindCreateDataBox(ClientContext &context, Binder &binder, OperatorExtensionInfo *info_p,
                                         SQLStatement &stmt) {
 	// down‐cast to see if it’s ours:
@@ -72,32 +67,24 @@ class DataBoxOperatorExtension : public OperatorExtension {
 	};
 };
 
-/// CREATE DATABOX
-struct CreateDataBoxInfo : public CreateSchemaInfo {
-    string name;
-    CreateDataBoxInfo()
-        : CreateSchemaInfo() {
-    }
-
-    unique_ptr<CreateInfo> Copy() const override {
-        auto result = make_uniq<CreateDataBoxInfo>();
-        CopyProperties(*result);
-        result->name = name;
-        return result;
-    }
-
-    string ToString() const override {
-        return "CREATE DATABOX " + catalog + "." + schema + "." + name;
-    }
-};
-
-
 ParserExtensionParseResult lakeshelf_parse(ParserExtensionInfo *, const string &query) {
-	//  statement->Cast<CreateStatement>().info = make_uniq<DataBoxCreateInfo>();
+	// Regex to match: CREATE DATABOX <catalog> . <shelf> . <schema> (optional ;) case-insensitive
+	static const std::regex pattern(
+	    R"(^\s*create\s+databox\s+\"?([A-Za-z_][A-Za-z0-9_]*)\"?\s*\.\s*\"?([A-Za-z_][A-Za-z0-9_]*)\"?\s*\.\s*\"?([A-Za-z_][A-Za-z0-9_]*)\"?\s*;?\s*$)",
+	    std::regex_constants::icase);
+	std::smatch matches;
+
+	if (!std::regex_match(query, matches, pattern)) {
+		// return error here
+	}
+
 	auto stm = make_uniq<CreateStatement>();
-	auto create_info = make_uniq<CreateSchemaInfo>();
-	create_info->catalog = "my_ducklake";
-	create_info->schema = "funziona";
+	auto create_info = make_uniq<CreateDataBoxInfo>();
+
+	create_info->catalog = matches[1].str();
+	create_info->shelf = matches[2].str();
+	create_info->schema = matches[3].str();
+
 	stm->info = std::move(create_info);
 	stm->stmt_location = 0; // offset in the original string
 	stm->stmt_length = query.length();
