@@ -21,7 +21,6 @@
 		"tuple": "cpp",
 		"utility": "cpp",
 		"variant": "cpp",
-		"typeinfo": "cpp",
 		"atomic": "cpp",
 		"bit": "cpp",
 		"bitset": "cpp",
@@ -72,6 +71,9 @@
 		"stdexcept": "cpp",
 		"stop_token": "cpp",
 		"streambuf": "cpp",
-		"thread": "cpp"
+		"thread": "cpp",
+		"typeinfo": "cpp",
+		"ast_nodes.h": "c",
+		"parser.tab.h": "c"
 	}
 }

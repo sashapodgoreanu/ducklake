@@ -59,6 +59,13 @@ string DuckLakeCatalog::GeneratePathFromName(const string &uuid, const string &n
 }
 
 optional_ptr<CatalogEntry> DuckLakeCatalog::CreateSchema(CatalogTransaction transaction, CreateSchemaInfo &info) {
+
+	string shelf = "";
+	// is actually a CreateDataBoxInfo ?
+	if (auto *db_info = dynamic_cast<CreateDataBoxInfo *>(&info)) {
+		shelf = db_info->shelf;
+	}
+
 	auto schema = GetSchema(transaction, info.schema, OnEntryNotFound::RETURN_NULL);
 	if (schema) {
 		if (info.on_conflict == OnCreateConflict::IGNORE_ON_CONFLICT) {
@@ -208,13 +215,13 @@ unique_ptr<DuckLakeCatalogSet> DuckLakeCatalog::LoadSchemaForSnapshot(DuckLakeTr
 		schema_info.schema = schema.name;
 		auto schema_entry = make_uniq<DuckLakeSchemaEntry>(*this, schema_info, schema.id, std::move(schema.uuid),
 		                                                   std::move(schema.path));
-	/************ IRION ************/
+		/************ IRION ************/
 		// cerca la databox associata se esiste
 		auto result = catalog.databox_list.find(schema.id);
 		if (result != catalog.databox_list.end()) {
 			schema_entry->LinkToDatabox(result->second);
 		}
-			/************ IRION ************/
+		/************ IRION ************/
 		schema_map.insert(make_pair(std::move(schema.name), std::move(schema_entry)));
 	}
 
