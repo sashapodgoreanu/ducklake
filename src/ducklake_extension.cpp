@@ -69,20 +69,27 @@ class DataBoxOperatorExtension : public OperatorExtension {
 
 ParserExtensionParseResult lakeshelf_parse(ParserExtensionInfo *, const string &query) {
 	// Regex to match: CREATE DATABOX <catalog> . <shelf> . <schema> (optional ;) case-insensitive
+	// static const std::regex pattern(
+	//     R"(^\s*create\s+databox\s+\"?([A-Za-z_][A-Za-z0-9_]*)\"?\.\"?([A-Za-z_][A-Za-z0-9_]*)\"?\.\"?([A-Za-z_][A-Za-z0-9_]*)\"?\s*;?\s*$)",
+	//     std::regex_constants::icase);
 	static const std::regex pattern(
-	    R"(^\s*create\s+databox\s+\"?([A-Za-z_][A-Za-z0-9_]*)\"?\s*\.\s*\"?([A-Za-z_][A-Za-z0-9_]*)\"?\s*\.\s*\"?([A-Za-z_][A-Za-z0-9_]*)\"?\s*;?\s*$)",
+    R"(^\s*create\s+databox\s+(?:\"?([A-Za-z_][A-Za-z0-9_]*)\"?\.)?(?:\"?([A-Za-z_][A-Za-z0-9_]*)\"?\.)?\"?([A-Za-z_][A-Za-z0-9_]*)\"?\s*;?\s*$)",
 	    std::regex_constants::icase);
+
 	std::smatch matches;
 
 	if (!std::regex_match(query, matches, pattern)) {
 		// return error here
 	}
+	if (!matches[3].matched) throw ParserException(StringUtil::Format("No databox matching pattern for query '%s'", query));
 
 	auto stm = make_uniq<CreateStatement>();
 	auto create_info = make_uniq<CreateDataBoxInfo>();
 
-	create_info->catalog = matches[1].str();
-	create_info->shelf = matches[2].str();
+	create_info->catalog = matches[1].matched ? matches[1].str() : "__current__";
+	create_info->shelf = matches[2].matched ? matches[2].str() : "__current__";
+
+
 	create_info->schema = matches[3].str();
 
 	stm->info = std::move(create_info);
@@ -96,6 +103,7 @@ ParserExtensionPlanResult lakeshelf_plan(ParserExtensionInfo *, ClientContext &c
                                          unique_ptr<ParserExtensionParseData> parse_data) {
 
 	auto prql_state = make_shared_ptr<PsqlState>(std::move(parse_data));
+	context.registered_state->Remove("lakeshelf_plan");
 	context.registered_state->Insert("lakeshelf_plan", prql_state);
 
 	throw BinderException("Use bind instead");
@@ -111,12 +119,16 @@ struct PrqlParserExtension : public ParserExtension {
 BoundStatement prql_bind(ClientContext &context, Binder &binder, OperatorExtensionInfo *info, SQLStatement &statement) {
 
 	auto lookup = context.registered_state->Get<PsqlState>("lakeshelf_plan");
-	auto prql_state = (PsqlState *)lookup.get();
-	auto prql_parse_data = dynamic_cast<PsqlParseData *>(prql_state->parse_data.get());
+	if (lookup) {
+		auto prql_state = (PsqlState *)lookup.get();
+		auto prql_parse_data = dynamic_cast<PsqlParseData *>(prql_state->parse_data.get());
 
-	auto shelf_binder = Binder::CreateBinder(context, &binder);
-	auto bound_stmt = shelf_binder->Bind(*(prql_parse_data->statement));
-	return bound_stmt;
+		auto shelf_binder = Binder::CreateBinder(context, &binder);
+		auto bound_stmt = shelf_binder->Bind(*(prql_parse_data->statement));
+		return bound_stmt;
+	}
+
+	return {};
 }
 
 struct PrqlOperatorExtension : public OperatorExtension {

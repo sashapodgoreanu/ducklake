@@ -60,12 +60,19 @@ string DuckLakeCatalog::GeneratePathFromName(const string &uuid, const string &n
 
 optional_ptr<CatalogEntry> DuckLakeCatalog::CreateSchema(CatalogTransaction transaction, CreateSchemaInfo &info) {
 
+	auto &duck_transaction = transaction.transaction->Cast<DuckLakeTransaction>();
+
 	string shelf = "";
+	string databox = "";
 	// is actually a CreateDataBoxInfo ?
 	if (auto *db_info = dynamic_cast<CreateDataBoxInfo *>(&info)) {
 		shelf = db_info->shelf;
+		databox = db_info->schema;
+		info.schema = duck_transaction.GenerateUUID();
 	}
 
+	// per noi è un po' delicato e da capire bene cosa voglia dire, perchè non posso permettermi di droppare una schema
+	// solo perchè esiste già
 	auto schema = GetSchema(transaction, info.schema, OnEntryNotFound::RETURN_NULL);
 	if (schema) {
 		if (info.on_conflict == OnCreateConflict::IGNORE_ON_CONFLICT) {
@@ -80,7 +87,7 @@ optional_ptr<CatalogEntry> DuckLakeCatalog::CreateSchema(CatalogTransaction tran
 		drop_info.name = info.schema;
 		DropSchema(transaction.GetContext(), drop_info);
 	}
-	auto &duck_transaction = transaction.transaction->Cast<DuckLakeTransaction>();
+
 	//! get a local table-id
 	auto schema_id = SchemaIndex(duck_transaction.GetLocalCatalogId());
 	auto schema_uuid = duck_transaction.GenerateUUID();
@@ -89,6 +96,19 @@ optional_ptr<CatalogEntry> DuckLakeCatalog::CreateSchema(CatalogTransaction tran
 	    make_uniq<DuckLakeSchemaEntry>(*this, info, schema_id, std::move(schema_uuid), std::move(schema_data_path));
 	auto result = schema_entry.get();
 	duck_transaction.CreateEntry(std::move(schema_entry));
+
+	// IRION, se ho una databox, la creo
+	if (!databox.empty()) {
+		auto dbInfo = make_uniq<LakeShelfDataboxInfo>();
+		dbInfo->id = duck_transaction.GetLocalCatalogId();
+		dbInfo->key = databox;
+		// dbInfo.lake_shelf_id
+		dbInfo->lake_shelf_schema_name = shelf;
+		dbInfo->schema_name = info.schema;
+
+		duck_transaction.CreateDataBox(std::move(dbInfo));
+	}
+
 	return result;
 }
 
@@ -404,14 +424,19 @@ optional_ptr<DuckLakeTableStats> DuckLakeCatalog::GetTableStats(DuckLakeTransact
 	return entry->second.get();
 }
 
+unique_ptr<LakeShelfDataboxInfo> FindFromNewDataboxes(const string &lookup_name,
+                                                      vector<unique_ptr<LakeShelfDataboxInfo>> &infos) {
+	for (auto &schema : infos) {
+		if (schema->key == lookup_name)
+			return std::move(schema);
+	}
+	return nullptr;
+}
+
 optional_ptr<SchemaCatalogEntry> DuckLakeCatalog::LookupSchema(CatalogTransaction transaction,
                                                                const EntryLookupInfo &schema_lookup,
                                                                OnEntryNotFound if_not_found) {
 
-
-
-
-	// db1 -> schema1
 	auto &look_up_name = schema_lookup.GetEntryName();
 	// auto &schema_name = "schema3";
 	auto at_clause = schema_lookup.GetAtClause();
@@ -421,35 +446,56 @@ optional_ptr<SchemaCatalogEntry> DuckLakeCatalog::LookupSchema(CatalogTransactio
 		// if we have an AT clause we can never read transaction-local changes
 		// look for the schema in the set of transaction-local schemas
 		auto set = duck_transaction.GetTransactionLocalSchemas();
+
 		if (set) {
-			auto entry = set->GetEntry<SchemaCatalogEntry>(look_up_name);
-			if (entry) {
-				return entry;
+
+			// controllo tra le databox create nella transazione corrente
+			auto newBoxes = duck_transaction.GetTransactionLocalDataboxes();
+
+			if (newBoxes && !newBoxes->empty()) {
+				auto newDatabox = FindFromNewDataboxes(look_up_name, *newBoxes.get());
+				if (newDatabox) {
+					auto entry = set->GetEntry<SchemaCatalogEntry>(newDatabox->schema_name);
+					if (entry) {
+						return entry;
+					}
+				}
+			} else {
+				auto entry = set->GetEntry<SchemaCatalogEntry>(look_up_name);
+				if (entry) {
+					return entry;
+				}
 			}
 		}
 	}
+
 	auto snapshot = duck_transaction.GetSnapshot(at_clause);
 	auto &schemas = GetSchemaForSnapshot(duck_transaction, snapshot);
 
-
-	//recupero context dalle options dell'ATTACH, eg. shelf.dbox
+	// verificare meglio la gestione del default schema, in questo caso ctx viene sempre usato e quindi la databox
+	// verrà sempre usata, anche se non dovrebbe
+	// recupero context dalle options dell'ATTACH, eg. shelf.dbox
 	auto &ctx = options.shelf_context;
 
-	//verificare meglio la gestione del default schema, in questo caso ctx viene sempre usato e quindi la databox 
-	//verrà sempre usata, anche se non dovrebbe
+	// controllo per prima cosa che il look_up_name sia relativo ad un alias di connessione
+	auto alias = options.shelf_aliasis.find(look_up_name);
 
-	//controllo per prima cosa che il look_up_name sia relativo ad un alias di connessione
-	auto alias = options.shelf_aliasis.find(look_up_name);	
-
-	//se look_up_name è un alias, allora l'alias diventa il context
+	// se look_up_name è un alias, allora l'alias diventa il context
 	if (alias != options.shelf_aliasis.end()) {
 		ctx = alias->second;
 	}
-	
-	//a questo punto cerco la datbox per context
+
+	//temporary fix, se il contesto di attach ctx è diverso dallo schema richiesto da lookup_name, allora uso quello
+	//così da evitare di estrarre sempre la stessa databox di attach
+	if (ctx.databox_key != look_up_name)
+	{
+		ctx.databox_key = look_up_name;
+	}
+
+	// a questo punto cerco la datbox per context
 	auto entry = schemas.GetEntryByDatabox<SchemaCatalogEntry>(ctx);
-	
-	//se non la trovo, vuol dire che è un semplice schema
+
+	// se non la trovo, vuol dire che è un semplice schema
 	if (!entry) {
 		entry = schemas.GetEntry<SchemaCatalogEntry>(look_up_name);
 	}

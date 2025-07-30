@@ -243,8 +243,9 @@ DuckLakeCatalogInfo DuckLakeMetadataManager::GetCatalogForSnapshot(DuckLakeSnaps
 
 
 		/************ IRION ************/
+		//todo, ricordarsi di leggere prima gli schema degli shelf per poi iterare sulle databox
 	auto result = transaction.Query(snapshot, R"(
-SELECT data_box_id, data_box_key, schema_id
+SELECT data_box_id, data_box_key, schema_id, 'bcd123' as lake_shelf_schema_name
 FROM {METADATA_CATALOG_NAME_IDENTIFIER}.bcd123.databox_list
 WHERE {SNAPSHOT_ID} >= begin_snapshot AND ({SNAPSHOT_ID} < end_snapshot OR end_snapshot IS NULL)
 )");
@@ -258,6 +259,7 @@ WHERE {SNAPSHOT_ID} >= begin_snapshot AND ({SNAPSHOT_ID} < end_snapshot OR end_s
 		databox_info.id = row.GetValue<int32_t>(0);
 		databox_info.key = row.GetValue<string>(1);
 		databox_info.schema_id = SchemaIndex(row.GetValue<int32_t>(2));
+		databox_info.lake_shelf_schema_name = row.GetValue<string>(3);
 		catalog.databox_list[databox_info.schema_id] = databox_info;
 	}
 
@@ -912,6 +914,59 @@ void DuckLakeMetadataManager::DropTables(DuckLakeSnapshot commit_snapshot, set<T
 void DuckLakeMetadataManager::DropViews(DuckLakeSnapshot commit_snapshot, set<TableIndex> ids) {
 	FlushDrop(commit_snapshot, "ducklake_view", "view_id", ids);
 }
+
+//IRION:TODO=gestire metodo WriteNewDataboxes con le stesse logiche
+void DuckLakeMetadataManager::WriteNewDataboxes(DuckLakeSnapshot commit_snapshot,
+                                               const vector<unique_ptr<LakeShelfDataboxInfo>> &new_boxes) {
+	if (new_boxes.empty()) {
+		throw InternalException("No databoxes to create - should be handled elsewhere");
+	}
+
+	case_insensitive_map_t<string> queries;
+
+	// auto catalog = GetCatalogForSnapshot(commit_snapshot);
+
+	//cosa succede se in due creiamo una databox con lo stesso nome?
+	//recuperare in qualche modo il nome dello schema dello shelf, per adesso statico a 'bcd123'
+	for (auto &new_box : new_boxes) {
+
+		// auto schema_id = ; //new_box.schema_id;
+		// auto path = GetRelativePath(new_box.path);
+		// ricordarsi di gestire lo snapshot
+		string databox_insert_sql = StringUtil::Format("(%d, '%s', (SELECT schema_id FROM {METADATA_CATALOG}.ducklake_schema WHERE schema_name = '%s'), {SNAPSHOT_ID}, NULL)", 
+															commit_snapshot.next_catalog_id++, new_box->key, new_box->schema_name);	//eventuale gestione del path
+		
+		//cerco per lo shelf se esiste già una query di values
+		//se esiste appendo i valori
+		//altrimenti aggiungo la nuova chiave e la nuova stringa
+		auto f = queries.find(new_box->lake_shelf_schema_name);
+		if (f != queries.end() ){
+			f->second += ", ";
+			f->second += databox_insert_sql;
+		} else {
+			queries.insert(make_pair(new_box->lake_shelf_schema_name, databox_insert_sql));
+		}
+	}
+
+	 // write databox metadata in transaction
+    for (const auto& [key, value] : queries) {
+
+		// auto shelf_schema = LookupShelfSchema(key, catalog.schemas);
+
+		string sql_insert = "INSERT INTO {METADATA_CATALOG_NAME_IDENTIFIER}.bcd123.databox_list VALUES " + value;
+		auto result = transaction.Query(commit_snapshot, sql_insert);
+		if (result->HasError()) {
+			result->GetErrorObject().Throw("Failed to write new databox to LakeShelf: ");
+		}
+    }
+}
+
+// unique_ptr<DuckLakeSchemaInfo> LookupShelfSchema(SchemaIndex index, vector<DuckLakeSchemaInfo> &schemas) {
+// 	for (auto &schema : schemas) {
+// 		if (schema.id == index) return make_uniq<DuckLakeSchemaInfo>(schema);
+// 	}
+// 	return nullptr;
+// }
 
 void DuckLakeMetadataManager::WriteNewSchemas(DuckLakeSnapshot commit_snapshot,
                                               const vector<DuckLakeSchemaInfo> &new_schemas) {

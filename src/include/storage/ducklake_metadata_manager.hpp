@@ -60,6 +60,9 @@ public:
 	virtual void DropTables(DuckLakeSnapshot commit_snapshot, set<TableIndex> ids);
 	virtual void DropViews(DuckLakeSnapshot commit_snapshot, set<TableIndex> ids);
 	virtual void WriteNewSchemas(DuckLakeSnapshot commit_snapshot, const vector<DuckLakeSchemaInfo> &new_schemas);
+	/*IRION*/
+	virtual void WriteNewDataboxes(DuckLakeSnapshot commit_snapshot, const vector<unique_ptr<LakeShelfDataboxInfo>> &new_boxes);
+	/**/
 	virtual void WriteNewTables(DuckLakeSnapshot commit_snapshot, const vector<DuckLakeTableInfo> &new_tables);
 	virtual void WriteNewViews(DuckLakeSnapshot commit_snapshot, const vector<DuckLakeViewInfo> &new_views);
 	virtual void WriteNewPartitionKeys(DuckLakeSnapshot commit_snapshot,

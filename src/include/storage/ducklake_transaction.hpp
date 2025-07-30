@@ -60,6 +60,9 @@ public:
 	static DuckLakeTransaction &Get(ClientContext &context, Catalog &catalog);
 
 	void CreateEntry(unique_ptr<CatalogEntry> entry);
+
+	void CreateDataBox(unique_ptr<LakeShelfDataboxInfo> dbInfo);
+
 	void DropEntry(CatalogEntry &entry);
 	bool IsDeleted(CatalogEntry &entry);
 	optional_ptr<CatalogEntry> GetLocalEntryById(SchemaIndex schema_id);
@@ -69,6 +72,9 @@ public:
 
 	DuckLakeCatalogSet &GetOrCreateTransactionLocalEntries(CatalogEntry &entry);
 	optional_ptr<DuckLakeCatalogSet> GetTransactionLocalSchemas();
+	//IRION
+	optional_ptr<vector<unique_ptr<LakeShelfDataboxInfo>>> GetTransactionLocalDataboxes();
+	//
 	optional_ptr<DuckLakeCatalogSet> GetTransactionLocalEntries(CatalogType type, const string &schema_name);
 	optional_ptr<CatalogEntry> GetTransactionLocalEntry(CatalogType catalog_type, const string &schema_name,
 	                                                    const string &entry_name);
@@ -174,6 +180,10 @@ private:
 	set<TableIndex> tables_deleted_from;
 	//! Schemas added by this transaction
 	unique_ptr<DuckLakeCatalogSet> new_schemas;
+	//! Schemas added by this transaction
+	/*IRION*/
+	vector<unique_ptr<LakeShelfDataboxInfo>> new_databoxes;
+	/*****/
 	map<SchemaIndex, reference<DuckLakeSchemaEntry>> dropped_schemas;
 	//! Data files added by this transaction
 	map<TableIndex, vector<DuckLakeDataFile>> new_data_files;

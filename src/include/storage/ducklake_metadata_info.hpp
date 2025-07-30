@@ -53,6 +53,8 @@ struct LakeShelfDataboxInfo {
 	string key;
 	SchemaIndex schema_id;
 	idx_t lake_shelf_id;
+	string lake_shelf_schema_name;
+	string schema_name;
 };
 
 struct LakeShelfMetadata {

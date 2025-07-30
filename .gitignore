@@ -7,3 +7,9 @@ testext
 test/python/__pycache__/
 .Rhistory
 test.db
+test.db.files/01985bdb-5a69-7c06-a8e8-40dce818de5d/tbl12345667/ducklake-01985bdd-e01a-7ccc-96ca-d4197c75c272.parquet
+test.db.files/01985bdb-5a69-7c06-a8e8-40dce818de5d/tblat/ducklake-01985be1-6d0c-7fb7-92ce-e7ecea3e8d71.parquet
+test.db.files/01985bdb-5a69-7c06-a8e8-40dce818de5d/tblat/ducklake-01985be2-4d9f-710c-a979-b9a50bd55b7e.parquet
+test.db.files/01985bdb-5a69-7c06-a8e8-40dce818de5d/tblat/ducklake-01985be2-acd4-7448-8f02-8386d7569523.parquet
+test.db.files/01985bdb-5a69-7c06-a8e8-40dce818de5d/tblat/ducklake-01985be3-8e6f-7101-ba38-1c94577c7fb1.parquet
+test.db.wal

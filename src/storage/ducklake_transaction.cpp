@@ -1092,10 +1092,16 @@ void DuckLakeTransaction::CommitChanges(DuckLakeSnapshot &commit_snapshot,
 		}
 		metadata_manager->DropSchemas(commit_snapshot, dropped_schema_ids);
 	}
+
 	// write new schemas
 	if (new_schemas) {
 		auto schema_list = GetNewSchemas(commit_snapshot);
 		metadata_manager->WriteNewSchemas(commit_snapshot, schema_list);
+	}
+	//IRION: WriteNewDataboxes dopo la scrittura degli schema così da ottenere l'id corretto
+	// write new schemas
+	if (!new_databoxes.empty()) {
+		metadata_manager->WriteNewDataboxes(commit_snapshot, new_databoxes);
 	}
 
 	// write new tables
@@ -1605,6 +1611,11 @@ void DuckLakeTransaction::CreateEntry(unique_ptr<CatalogEntry> entry) {
 	set.CreateEntry(std::move(entry));
 }
 
+/*Irion*/
+void DuckLakeTransaction::CreateDataBox(unique_ptr<LakeShelfDataboxInfo> dbInfo) {
+	new_databoxes.emplace_back(std::move(dbInfo));
+}
+
 void DuckLakeTransaction::DropSchema(DuckLakeSchemaEntry &schema) {
 	auto schema_id = schema.GetSchemaId();
 	if (schema_id.IsTransactionLocal()) {
@@ -1814,6 +1825,10 @@ DuckLakeCatalogSet &DuckLakeTransaction::GetOrCreateTransactionLocalEntries(Cata
 
 optional_ptr<DuckLakeCatalogSet> DuckLakeTransaction::GetTransactionLocalSchemas() {
 	return new_schemas;
+}
+
+optional_ptr<vector<unique_ptr<LakeShelfDataboxInfo>>> DuckLakeTransaction::GetTransactionLocalDataboxes() {
+	return new_databoxes;
 }
 
 optional_ptr<CatalogEntry> DuckLakeTransaction::GetTransactionLocalEntry(CatalogType catalog_type,
