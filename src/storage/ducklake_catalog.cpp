@@ -424,11 +424,11 @@ optional_ptr<DuckLakeTableStats> DuckLakeCatalog::GetTableStats(DuckLakeTransact
 	return entry->second.get();
 }
 
-unique_ptr<LakeShelfDataboxInfo> FindFromNewDataboxes(const string &lookup_name,
+optional_ptr<LakeShelfDataboxInfo> FindFromNewDataboxes(const string &lookup_name,
                                                       vector<unique_ptr<LakeShelfDataboxInfo>> &infos) {
 	for (auto &schema : infos) {
 		if (schema->key == lookup_name)
-			return std::move(schema);
+			return schema;
 	}
 	return nullptr;
 }
