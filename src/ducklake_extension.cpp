@@ -13,7 +13,10 @@
 #include "duckdb/parser/parsed_data/create_schema_info.hpp"
 #include "duckdb/parser/statement/extension_statement.hpp"
 #include "storage/ducklake_catalog.hpp"
-
+#include "duckdb/parser/statement/select_statement.hpp"
+#include "duckdb/parser/query_node/select_node.hpp"
+#include "duckdb/parser/parser.hpp"
+#include "duckdb/parser/tableref/basetableref.hpp"
 #include <regex>
 #include <memory>
 
@@ -68,6 +71,22 @@ class DataBoxOperatorExtension : public OperatorExtension {
 };
 
 ParserExtensionParseResult lakeshelf_parse(ParserExtensionInfo *, const string &query) {
+
+	// Parser parser;
+	// auto new_q = query.substr(1);
+	// parser.ParseQuery(new_q);
+
+	// auto st = std::move(parser.statements[0]);
+
+	// if (st.get()->type == StatementType::SELECT_STATEMENT) {
+	// 	auto ss = dynamic_cast<SelectStatement *>(st.get());
+	// 	auto qn = ss->node.get();
+	// 	auto select_node = dynamic_cast<SelectNode *>(qn);
+	// 	auto &bt = select_node->from_table.get()->Cast<BaseTableRef>();
+	// 	bt.table_name = "modificato";
+	// 	auto qq = st->ToString();
+	// }
+
 	// Regex to match: CREATE DATABOX <catalog> . <shelf> . <schema> (optional ;) case-insensitive
 	// static const std::regex pattern(
 	//     R"(^\s*create\s+databox\s+\"?([A-Za-z_][A-Za-z0-9_]*)\"?\.\"?([A-Za-z_][A-Za-z0-9_]*)\"?\.\"?([A-Za-z_][A-Za-z0-9_]*)\"?\s*;?\s*$)",
@@ -135,6 +154,11 @@ BoundStatement prql_bind(ClientContext &context, Binder &binder, OperatorExtensi
 	}
 	default:
 		// No-op empty
+
+		// auto &select_statement = dynamic_cast<SelectStatement &>(statement);
+		// QueryNode *qn = select_statement.node.get();
+		// auto *select_node = dynamic_cast<SelectNode *>(qn);
+		// p.Parse()
 		return {};
 	}
 }
